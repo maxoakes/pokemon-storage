@@ -50,6 +50,12 @@ class Pokemon:
         self.trainer_id = 0
         self.trainer_name = ""
         self.experience_points = 0
+        self.friendship = 0
+        self.pokerus = 0
+        self.catch_time = 0
+        self.catch_date = 0
+        self.catch_level = 0
+        self.catch_location = 0
         self.hp_stat_experience = 0
         self.hp_stat = 0
         self.hp_iv = 0
@@ -68,16 +74,17 @@ class Pokemon:
         self.speed_stat = 0
         self.speed_stat_experience = 0
         self.speed_iv = 0
-        self.move1_pp = 0
-        self.move2_pp = 0
-        self.move3_pp = 0
-        self.move4_pp = 0 
+        self.move1_pp = b"0x00"
+        self.move2_pp = b"0x00"
+        self.move3_pp = b"0x00"
+        self.move4_pp = b"0x00"
 
     def console_print(self):
         print(
             f"{self.species_id}: {Lookup.pokemon.get(self.species_id, '???')} AKA:[{self.nickname}]",
             f"\tLv.{self.level} Exp:{self.experience_points}",
             f"\tOT:{self.trainer_name}/{self.trainer_id}",
+            f"\tItem:{self.held_item}",
             f"\tAtk:{self.attack_stat}({self.attack_stat_experience}) IV:{self.attack_iv}",
             f"\tDef:{self.defense_stat}({self.defense_stat_experience}) IV:{self.defense_iv}",
             f"\tSpA:{self.special_attack_stat}({self.special_attack_stat_experience}) IV:{self.special_attack_iv}",
