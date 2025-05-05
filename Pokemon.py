@@ -39,19 +39,31 @@ class Pokemon:
 
     def __init__(self, generation):
         self.generation = generation
+        self.language = 0
         self.generation = 0
+        self.markings = 0
+        self.mail_id = 0
+        self.is_egg = 0
         self.species_id = 0
         self.level = 0
         self.held_item = 0
+        self.personality_value = 0
+        self.ability = 0
         self.move1 = 0
         self.move2 = 0
         self.move3 = 0
         self.move4 = 0
         self.trainer_id = 0
         self.trainer_name = ""
+        self.trainer_gender = 0
+        self.pokeball = 0
+        self.origin_game = 0
+        self.level_met = 0
         self.experience_points = 0
         self.friendship = 0
         self.pokerus = 0
+        self.met_location = 0
+        self.pokerus_days_remaining = 0
         self.catch_time = 0
         self.catch_date = 0
         self.catch_level = 0
@@ -74,10 +86,39 @@ class Pokemon:
         self.speed_stat = 0
         self.speed_stat_experience = 0
         self.speed_iv = 0
-        self.move1_pp = b"0x00"
-        self.move2_pp = b"0x00"
-        self.move3_pp = b"0x00"
-        self.move4_pp = b"0x00"
+        self.coolness = 0
+        self.beauty = 0
+        self.cuteness = 0
+        self.smartness = 0
+        self.toughness = 0
+        self.feel = 0
+        self.move1_pp = 0
+        self.move2_pp = 0
+        self.move3_pp = 0
+        self.move4_pp = 0
+        self.move1_pp_times = 0
+        self.move2_pp_times = 0
+        self.move3_pp_times = 0
+        self.move4_pp_times = 0
+        self.cool_ribbon = 0
+        self.beauty_ribbon = 0
+        self.cute_ribbon = 0
+        self.smart_ribbon = 0
+        self.tough_ribbon = 0
+        self.champion_ribbon = 0
+        self.winning_ribbon = 0
+        self.victory_ribbon = 0
+        self.artist_ribbon = 0
+        self.effort_ribbon = 0
+        self.battle_champion_ribbon = 0
+        self.regional_champion_ribbon = 0
+        self.national_champion_ribbon = 0
+        self.country_ribbon = 0
+        self.national_ribbon = 0
+        self.earth_ribbon = 0
+        self.world_ribbon = 0
+        self.obedience = 0
+
 
     def console_print(self):
         print(
@@ -90,16 +131,20 @@ class Pokemon:
             f"\tSpA:{self.special_attack_stat}({self.special_attack_stat_experience}) IV:{self.special_attack_iv}",
             f"\tSpD:{self.special_defense_stat}({self.special_defense_stat_experience}) IV:{self.special_defense_iv}",
             f"\tSpe:{self.speed_stat}({self.speed_stat_experience}) IV:{self.speed_iv}",
-            f"\tM1:{self.move1}:{Lookup.moves.get(self.move1, '???')} ({Pokemon.parse_move_byte(self.move1_pp)[0]})",
-            f"\tM2:{self.move2}:{Lookup.moves.get(self.move2, '???')} ({Pokemon.parse_move_byte(self.move2_pp)[0]})",
-            f"\tM3:{self.move3}:{Lookup.moves.get(self.move3, '???')} ({Pokemon.parse_move_byte(self.move3_pp)[0]})",
-            f"\tM4:{self.move4}:{Lookup.moves.get(self.move4, '???')} ({Pokemon.parse_move_byte(self.move4_pp)[0]})",
+            f"\tM1:{self.move1}:{Lookup.moves.get(self.move1, '???')} ({self.move1_pp}|{self.move1_pp_times})",
+            f"\tM2:{self.move2}:{Lookup.moves.get(self.move2, '???')} ({self.move2_pp}|{self.move2_pp_times})",
+            f"\tM3:{self.move3}:{Lookup.moves.get(self.move3, '???')} ({self.move3_pp}|{self.move3_pp_times})",
+            f"\tM4:{self.move4}:{Lookup.moves.get(self.move4, '???')} ({self.move4_pp}|{self.move4_pp_times})",
         sep=os.linesep)
 
     def parse_move_byte(byte: str):
-        bits = bin(int.from_bytes(byte))[2:]
-        bits = str.zfill(bits, 8)
-        return (int(bits[2:8], 2), int(bits[0:2], 2))
+        print(type(byte))
+        if type(byte) is int:
+            return byte
+        else:
+            bits = bin(int.from_bytes(byte))[2:]
+            bits = str.zfill(bits, 8)
+            return (int(bits[2:8], 2), int(bits[0:2], 2))
 
     def __str__(self):
         return f"{self.species_id}: Lv.{self.level}; {self.hp_stat}/{self.attack_stat}/{self.defense_stat}/{self.special_attack_stat}/{self.special_defense_stat}/{self.speed_stat}"
