@@ -4,15 +4,29 @@ from Lookup import Lookup
 class Pokemon:
     generation: int
     species_id: int
+    alternate_form: int
     level: int
+    gender: int
     held_item: int
     move1: int
     move2: int
     move3: int
     move4: int
+    fateful_encounter: int
+    has_nickname: int
     nickname: str
+    
+    egg_hatch_location: int
+    egg_receive_date: int
+    met_date: int
     trainer_id: int
+    trainer_secret_id: int
     trainer_name: str
+    trainer_gender: int
+    encounter_type: int
+    walking_mood: int
+    seals: int
+    seal_coordinates: int
     experience_points: int
     hp_stat_experience: int
     hp_stat: int
@@ -32,10 +46,17 @@ class Pokemon:
     speed_stat: int
     speed_stat_experience: int
     speed_iv: int
-    move1_pp: str
-    move2_pp: str
-    move3_pp: str
-    move4_pp: str 
+    move1_pp: int
+    move2_pp: int
+    move3_pp: int
+    move4_pp: int 
+    sinnoh_ribbons_1 = 0
+    sinnoh_ribbons_2 = 0
+    shiny_leaf_1 = 0
+    shiny_leaf_2 = 0
+    shiny_leaf_3 = 0
+    shiny_leaf_4 = 0
+    shiny_crown = 0
 
     def __init__(self, generation):
         self.generation = generation
@@ -55,7 +76,7 @@ class Pokemon:
         self.move4 = 0
         self.trainer_id = 0
         self.trainer_name = ""
-        self.trainer_gender = 0
+        self.nickname = ""
         self.pokeball = 0
         self.origin_game = 0
         self.level_met = 0
@@ -91,7 +112,7 @@ class Pokemon:
         self.cuteness = 0
         self.smartness = 0
         self.toughness = 0
-        self.feel = 0
+        self.sheen = 0
         self.move1_pp = 0
         self.move2_pp = 0
         self.move3_pp = 0
@@ -118,13 +139,16 @@ class Pokemon:
         self.earth_ribbon = 0
         self.world_ribbon = 0
         self.obedience = 0
+        self.sinnoh_ribbons_1 = 0
+        self.sinnoh_ribbons_2 = 0
+
 
 
     def console_print(self):
         print(
             f"{self.species_id}: {Lookup.pokemon.get(self.species_id, '???')} AKA:[{self.nickname}]",
             f"\tLv.{self.level} Exp:{self.experience_points}",
-            f"\tOT:{self.trainer_name}/{self.trainer_id}",
+            f"\tOT:{self.trainer_name}/{self.trainer_id}&{self.trainer_secret_id}",
             f"\tItem:{self.held_item}",
             f"\tAtk:{self.attack_stat}({self.attack_stat_experience}) IV:{self.attack_iv}",
             f"\tDef:{self.defense_stat}({self.defense_stat_experience}) IV:{self.defense_iv}",

@@ -8,6 +8,7 @@ class Lookup:
     moves: dict[int, str]
     pokemon_gen1_index = dict[int, int]
     pokemon_gen3_index = dict[int, int]
+    pokemon_gen4_index = dict[int, int]
 
     def initialize():
         Lookup.games = {}
@@ -15,6 +16,7 @@ class Lookup:
         Lookup.moves = {}
         Lookup.pokemon_gen1_index = {}
         Lookup.pokemon_gen3_index = {}
+        Lookup.pokemon_gen4_index = {}
 
         def keystoint(x):
             return {int(k): v for k, v in x.items()}
@@ -55,3 +57,21 @@ class Lookup:
         pokemon_results = Database.run_query_return_rows("SELECT id, identifier FROM pokemon_forms")
         for (id, name) in pokemon_results:
             Lookup.pokemon[id] = name
+
+        gen4_id_results = Database.run_query_return_rows("SELECT id FROM pokemon_species ps WHERE generation_id IN (1,2,3,4)")
+        for (id) in gen4_id_results:
+            Lookup.pokemon_gen4_index[id] = id
+
+        # special cases
+        Lookup.pokemon_gen4_index[496] = 386
+        Lookup.pokemon_gen4_index[497] = 386
+        Lookup.pokemon_gen4_index[498] = 386
+        Lookup.pokemon_gen4_index[499] = 413
+        Lookup.pokemon_gen4_index[500] = 413
+        Lookup.pokemon_gen4_index[501] = 487
+        Lookup.pokemon_gen4_index[502] = 492
+        Lookup.pokemon_gen4_index[503] = 479
+        Lookup.pokemon_gen4_index[504] = 479
+        Lookup.pokemon_gen4_index[505] = 479
+        Lookup.pokemon_gen4_index[506] = 479
+        Lookup.pokemon_gen4_index[507] = 479
