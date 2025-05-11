@@ -1,9 +1,7 @@
 from ByteUtility import ByteUtility
-from Database import Database
-from Game import Game
+from Models.Game import Game
 from Lookup import Lookup
-from Pokemon import Pokemon
-
+from Models.Pokemon import Pokemon
 
 class Extractor:
     
@@ -48,67 +46,9 @@ class Extractor:
                     print(f"Looking at party slot #{party_slot_id}")
                     start_offset = 0x8+(0x2C*party_slot_id)
                     pokemon_bytes = ByteUtility.get_bytes(party_bytes, start_offset, 0x2C)
+
                     pokemon = Pokemon(1)
-
-                    # get pokemon name and OT
-                    pokemon.nickname = pokemon_nicknames[i]
-                    pokemon.trainer_name = original_trainers[i]
-                    pokemon.trainer_id = ByteUtility.get_int(pokemon_bytes,0x0C, 0x02)
-
-                    # https://bulbapedia.bulbagarden.net/wiki/Pok%C3%A9mon_data_structure_(Generation_I)
-                    # get species id
-                    pokemon.species_id = Lookup.pokemon_gen1_index.get(int.from_bytes(pokemon_bytes[0x00:0x01]), 0)
-
-                    # get level
-                    pokemon.level = ByteUtility.get_int(pokemon_bytes, 0x21, 0x01)
-                    pokemon.experience_points = ByteUtility.get_int(pokemon_bytes, 0x0E, 0x03)
-
-                    # get moves
-                    pokemon.move1 = ByteUtility.get_int(pokemon_bytes, 0x08, 0x01)
-                    pokemon.move2 = ByteUtility.get_int(pokemon_bytes, 0x09, 0x01)
-                    pokemon.move3 = ByteUtility.get_int(pokemon_bytes, 0x0A, 0x01)
-                    pokemon.move4 = ByteUtility.get_int(pokemon_bytes, 0x0B, 0x01)
-
-                    # pp
-                    pp1 = bin(ByteUtility.get_int(pokemon_bytes, 0x1D, 1))[2:].zfill(8)
-                    pokemon.move1_pp = int(pp1[2:8], 2)
-                    pokemon.move1_pp_times = int(pp1[0:2], 2)
-
-                    pp2 = bin(ByteUtility.get_int(pokemon_bytes, 0x1E, 1))[2:].zfill(8)
-                    pokemon.move2_pp = int(pp2[2:8], 2)
-                    pokemon.move2_pp_times = int(pp2[0:2], 2)
-
-                    pp3 = bin(ByteUtility.get_int(pokemon_bytes, 0x1F, 1))[2:].zfill(8)
-                    pokemon.move3_pp = int(pp3[2:8], 2)
-                    pokemon.move3_pp_times = int(pp3[0:2], 2)
-
-                    pp4 = bin(ByteUtility.get_int(pokemon_bytes, 0x20, 1))[2:].zfill(8)
-                    pokemon.move4_pp = int(pp4[2:8], 2)
-                    pokemon.move4_pp_times = int(pp4[0:2], 2)
-
-                    # get stats
-                    pokemon.hp_stat_experience = ByteUtility.get_int(pokemon_bytes, 0x11, 0x02)
-                    pokemon.attack_stat_experience = ByteUtility.get_int(pokemon_bytes, 0x13, 0x02)
-                    pokemon.defense_stat_experience = ByteUtility.get_int(pokemon_bytes, 0x15, 0x02)
-                    pokemon.special_attack_stat_experience = ByteUtility.get_int(pokemon_bytes, 0x19, 0x02)
-                    pokemon.special_defense_stat_experience = ByteUtility.get_int(pokemon_bytes, 0x19, 0x02)
-                    pokemon.speed_stat_experience = ByteUtility.get_int(pokemon_bytes, 0x17, 0x02)
-
-                    pokemon.hp_stat = ByteUtility.get_int(pokemon_bytes, 0x22, 0x02)
-                    pokemon.attack_stat = ByteUtility.get_int(pokemon_bytes, 0x24, 0x02)
-                    pokemon.defense_stat = ByteUtility.get_int(pokemon_bytes, 0x26, 0x02)
-                    pokemon.special_attack_stat = ByteUtility.get_int(pokemon_bytes, 0x2A, 0x02)
-                    pokemon.special_defense_stat = ByteUtility.get_int(pokemon_bytes, 0x2A, 0x02)
-                    pokemon.speed_stat = ByteUtility.get_int(pokemon_bytes, 0x28, 0x02)
-
-                    bits = bin(ByteUtility.get_int(pokemon_bytes, 0x1B, 0x02))[2:]
-                    iv_stats = [bits[i:i+4] for i in range(0, len(bits), 4)]
-                    pokemon.attack_iv = int(iv_stats[0], 2)
-                    pokemon.defense_iv = int(iv_stats[1], 2)
-                    pokemon.speed_iv = int(iv_stats[2], 2)
-                    pokemon.special_attack_iv = int(iv_stats[3], 2)
-                    pokemon.special_defense_iv = int(iv_stats[3], 2)
-
+                    pokemon.load_from_gen1_bytes(pokemon_bytes, version, pokemon_nicknames[i], original_trainers[i])
                     party.append(pokemon)
                 return party
                     
@@ -389,16 +329,27 @@ class Extractor:
 
             case 8 | 9 | 10:
                 # https://bulbapedia.bulbagarden.net/wiki/Save_data_structure_(Generation_IV)
+                # https://projectpokemon.org/home/docs/gen-4/hgss-save-structure-r76/
                 save = ByteUtility.get_bytes(content, 0x0, 49407)
 
                 # get player name
                 player_name = ByteUtility.get_encoded_string(ByteUtility.get_bytes(save,0x68,0x77-0x68), version, lang)
                 trainer_id = ByteUtility.get_int(save, 0x078, 2, True)
-                print(f"OT:{player_name}/{trainer_id}")
-
+                
                 # get party
                 party_size = ByteUtility.get_int(save, 0x9c, 1, True)
                 party_bytes = ByteUtility.get_bytes(save, 0xa0, 0x628-0xa0)
+
+                if version == 10:
+                    # get player name
+                    player_name = ByteUtility.get_encoded_string(ByteUtility.get_bytes(save,0x64,16), version, lang)
+                    trainer_id = ByteUtility.get_int(save, 0x074, 2, True)
+
+                    # get party
+                    party_size = ByteUtility.get_int(save, 0x94, 1, True)
+                    party_bytes = ByteUtility.get_bytes(save, 0x98, 236*6)
+
+                print(f"OT:{player_name}/{trainer_id}")
                 print(party_size, len(party_bytes))
 
                 for i in range(party_size):
@@ -469,7 +420,7 @@ class Extractor:
                     
                     pokemon.personality_value = ByteUtility.get_int(pokemon_bytes, 0x00, 4, True)
                     sort_order = ((pokemon.personality_value & 0x3E000) >> 0xD) % 24
-                    order_string = inverse[sort_order]
+                    order_string = order[sort_order]
                     print(f"Order:{sort_order}:{order_string}")
                     
                     block_size = 32
@@ -480,8 +431,8 @@ class Extractor:
                             case "A":
                                 pokemon.species_id = Lookup.pokemon_gen4_index.get(ByteUtility.get_int(substructure_bytes_decrypted, 0x08+offset, 2, True),0)
                                 pokemon.held_item = ByteUtility.get_int(substructure_bytes_decrypted, 0xA+offset, 2, True)
-                                pokemon.trainer_id = ByteUtility.get_int(substructure_bytes_decrypted, 0x0C, 2, True)
-                                pokemon.trainer_secret_id = ByteUtility.get_int(substructure_bytes_decrypted, 0x0E, 2, True)
+                                pokemon.trainer_id = ByteUtility.get_int(substructure_bytes_decrypted, 0x0C+offset, 2, True)
+                                pokemon.trainer_secret_id = ByteUtility.get_int(substructure_bytes_decrypted, 0x0E+offset, 2, True)
                                 pokemon.experience_points = ByteUtility.get_int(substructure_bytes_decrypted, 0x10+offset, 4, True)
                                 pokemon.friendship = ByteUtility.get_int(substructure_bytes_decrypted, 0x14+offset, 1, True)
                                 pokemon.ability = ByteUtility.get_int(substructure_bytes_decrypted, 0x15+offset, 1, True)
@@ -598,16 +549,31 @@ class Extractor:
                                 pass
 
                     # static encrypted bytes
-                    pokemon.level = ByteUtility.get_int(pokemon_bytes, 0x8c, 1, True)
-                    pokemon.seals = ByteUtility.get_int(pokemon_bytes, 0x8d, 1, True)
-                    pokemon.seal_coordinates = ByteUtility.get_int(pokemon_bytes, 0xd4, 0xeb-0xd4, True)
-                    pokemon.mail_id = len(ByteUtility.get_bytes(pokemon_bytes, 0x9c, 0xd3-0x9c))
-                    pokemon.hp_stat = ByteUtility.get_int(pokemon_bytes, 0x90, 2, True)
-                    pokemon.attack_stat = ByteUtility.get_int(pokemon_bytes, 0x92, 2, True)
-                    pokemon.defense_stat = ByteUtility.get_int(pokemon_bytes, 0x94, 2, True)
-                    pokemon.speed_stat = ByteUtility.get_int(pokemon_bytes, 0x96, 2, True)
-                    pokemon.special_attack_stat = ByteUtility.get_int(pokemon_bytes, 0x98, 2, True)
-                    pokemon.special_defense_stat = ByteUtility.get_int(pokemon_bytes, 0x9a, 2, True)
+                    # decryption
+                    battle_stats_encrypted = ByteUtility.get_bytes(pokemon_bytes, 0x88, 0xeb-0x88)
+
+                    prng = pokemon.personality_value
+                    word_size = 2
+                    battle_stats_decrypted = b''
+                    for i in range(64*word_size):
+                        if i % word_size == 0:
+                            prng = ((0x41C64E6D * prng) + 0x6073) 
+                            rand = prng >> 16
+                            y = ByteUtility.get_int(battle_stats_encrypted, i, word_size, True)
+                            unencrypted = (y ^ rand) & 0xffff
+                            battle_stats_decrypted += unencrypted.to_bytes(word_size, 'little')    
+
+                    offset = 0 - 0x88
+                    pokemon.level = ByteUtility.get_int(battle_stats_decrypted, offset+0x8c, 1, True)
+                    pokemon.seals = ByteUtility.get_int(battle_stats_decrypted, offset+0x8d, 1, True)
+                    pokemon.seal_coordinates = ByteUtility.get_int(battle_stats_decrypted, offset+0xd4, 0xeb-0xd4, True)
+                    pokemon.mail_id = len(ByteUtility.get_bytes(battle_stats_decrypted, offset+0x9c, 0xd3-0x9c))
+                    pokemon.hp_stat = ByteUtility.get_int(battle_stats_decrypted, offset+0x90, 2, True)
+                    pokemon.attack_stat = ByteUtility.get_int(battle_stats_decrypted, offset+0x92, 2, True)
+                    pokemon.defense_stat = ByteUtility.get_int(battle_stats_decrypted, offset+0x94, 2, True)
+                    pokemon.speed_stat = ByteUtility.get_int(battle_stats_decrypted, offset+0x96, 2, True)
+                    pokemon.special_attack_stat = ByteUtility.get_int(battle_stats_decrypted, offset+0x98, 2, True)
+                    pokemon.special_defense_stat = ByteUtility.get_int(battle_stats_decrypted, offset+0x9a, 2, True)
                     party.append(pokemon)
                 return party
 

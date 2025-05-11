@@ -23,9 +23,13 @@ class ByteUtility:
         return data[offset:offset+length]
 
 
-    def get_bit(byte, i):
-        return (byte >> i) & 1
-    
+    def get_bit(byte, i, little_endian=False, signed=False) -> int:
+        print(byte)
+        if isinstance(byte, bytes) or isinstance(byte, str):
+            result = ByteUtility.get_int(byte, 0, len(byte), little_endian, signed)
+            return (result >> i) & 1
+        elif isinstance(byte, int):
+            return (byte >> i) & 1
 
     def xor_bytes(a: bytes, b: bytes) -> bytes:
         if len(a) != len(b):

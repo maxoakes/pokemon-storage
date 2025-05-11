@@ -4,7 +4,8 @@ from dotenv import load_dotenv
 from Database import Database
 from Extractor import Extractor
 from Lookup import Lookup
-from Pokemon import Pokemon
+from Models.Pokemon import Pokemon
+from Models.Trainer import Trainer
 
 def main():
 
@@ -44,6 +45,7 @@ def main():
         mode = input("Selection: ")
 
     game = None
+    original_trainer = Trainer("OAK", 0, 1, 0)
     if len(sys.argv) > 3:
         try:
             game_id = int(sys.argv[3])
