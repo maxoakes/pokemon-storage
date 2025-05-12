@@ -31,14 +31,14 @@ class Extractor:
                 for i in range(count):
                     start_offset = 0xB*i
                     this_trainer_name_btyes = ByteUtility.get_bytes(party_bytes, 0x110+start_offset, 0xB)
-                    original_trainers.append(ByteUtility.get_string(this_trainer_name_btyes, version, lang))
+                    original_trainers.append(ByteUtility.get_encoded_string(this_trainer_name_btyes, version, lang))
                 
                 # get nicknames
                 pokemon_nicknames = [] 
                 for i in range(count):
                     start_offset = 0xB*i
                     this_pokemon_nickname_bytes = ByteUtility.get_bytes(party_bytes, 0x152+start_offset, 0xB)
-                    pokemon_nicknames.append(ByteUtility.get_string(this_pokemon_nickname_bytes, version, lang))
+                    pokemon_nicknames.append(ByteUtility.get_encoded_string(this_pokemon_nickname_bytes, version, lang))
 
                 # get party pokemon
                 for i in range(count):

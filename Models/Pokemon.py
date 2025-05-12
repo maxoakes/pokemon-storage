@@ -256,7 +256,7 @@ class Pokemon:
     def __init__(self, generation):
         # game
         self.generation = generation
-        self.language = ""
+        self.language = "EN"
 
         # overview
         self.original_trainer = None
@@ -313,7 +313,7 @@ class Pokemon:
     def console_print(self):
         print(
             f"{self.species_id}: {self.species} Form:{self.alternate_form_id} Gender:{self.gender} HasNickname:{self.has_nickname} Nickname:[{self.nickname}]",
-            f"\tGen:{self.generation} Lang:{Lookup.language.get(self.language, 'Unset')}",
+            f"\tGen:{self.generation} Lang:{self.language}",
             f"\tLv.{self.level} Exp:{self.experience_points} Frnd:{self.friendship} WalkMood:{self.walking_mood} Ob:{self.obedience} Pv:{self.personality_value} IsEgg:{self.is_egg}",
             f"\tOT:{self.original_trainer}",
             f"\tItem:{self.held_item} Ability:{self.ability}",
@@ -333,29 +333,19 @@ class Pokemon:
             f"\tM3:{self.moves.get(2, '')}",
             f"\tM4:{self.moves.get(3, '')}",
         sep=os.linesep)
-
-    def parse_move_byte(byte: str):
-        print(type(byte))
-        if type(byte) is int:
-            return byte
-        else:
-            bits = bin(int.from_bytes(byte))[2:]
-            bits = str.zfill(bits, 8)
-            return (int(bits[2:8], 2), int(bits[0:2], 2))
-
-    def __str__(self):
-        return f"{self.species}: Lv.{self.level}"
     
     # Decoding
     # https://bulbapedia.bulbagarden.net/wiki/Pok%C3%A9mon_data_structure_(Generation_I)
     def load_from_gen1_bytes(self, content: bytes, version: int, nickname, trainer_name):
         self.nickname = nickname
-        self.trainer_name = trainer_name
-        self.trainer_id = ByteUtility.get_int(content, 0x0C, 2)
+        self.original_trainer = Trainer(trainer_name, 0, ByteUtility.get_int(content, 0x0C, 2), 0)
         self.species_id = Lookup.pokemon_gen1_index.get(ByteUtility.get_int(content, 0, 1), 0)
-        self.species = Lookup.pokemon.get(self.species_id, "???")
+        self.species = Lookup.pokemon.get(self.species_id)
         self.level = ByteUtility.get_int(content, 0x21, 1)
         self.experience_points = ByteUtility.get_int(content, 0x0E, 3)
+        self.personality_value = Lookup.get_random_personality()
+        self.gender = Lookup.gender.get(Lookup.get_random_gender(self.species_id))
+        self.friendship = Lookup.base_happiness.get(self.species_id)
 
         # get moves
         pp1 = bin(ByteUtility.get_int(content, 0x1D, 1))[2:].zfill(8)

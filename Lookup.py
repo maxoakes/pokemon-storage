@@ -1,5 +1,5 @@
 import json
-from enum import Enum
+import random
 from Database import Database
 from Models.Game import Game
 from Models.Item import Item
@@ -9,7 +9,9 @@ class Lookup:
     pokemon: dict[int, str]
     moves: dict[int, str]
     items: dict[int, Item]
-    abilities = dict[int, str]
+    abilities: dict[int, str]
+    gender_rates: dict[int, int]
+    base_happiness: dict[int, int]
     language: dict[int, str]
     gender: dict[int, str]
     pokemon_gen1_index = dict[int, int]
@@ -24,6 +26,8 @@ class Lookup:
         Lookup.abilities = {}
         Lookup.language = {}
         Lookup.gender = {}
+        Lookup.gender_rates = {}
+        Lookup.base_happiness = {}
         Lookup.pokemon_gen1_index = {}
         Lookup.pokemon_gen3_index = {}
         Lookup.pokemon_gen4_index = {}
@@ -44,9 +48,12 @@ class Lookup:
         except:
             pass
 
-        gen4_id_results = Database.run_query_return_rows("SELECT id FROM pokemon_species ps WHERE generation_id IN (1,2,3,4)")
-        for (id,) in gen4_id_results:
-            Lookup.pokemon_gen4_index[id] = id
+        pokemon_species_results = Database.run_query_return_rows("SELECT id, generation_id, gender_rate, base_happiness FROM pokemon_species")
+        for (id, generation_id, gender, happiness) in pokemon_species_results:
+            if generation_id in (1,2,3,4):
+                Lookup.pokemon_gen4_index[id] = id
+            Lookup.gender_rates[id] = gender
+            Lookup.base_happiness[id] = happiness
 
         # special cases for gen4
         Lookup.pokemon_gen4_index[496] = 386
@@ -139,3 +146,16 @@ class Lookup:
                 if item.id_mapping[generation] == game_index:
                     return item.identifier
         return "?"
+    
+    def get_random_gender(species_id) -> int:
+        rate_id = Lookup.gender_rates.get(species_id, -1)
+        if rate_id == -1:
+            return 2
+        
+        if random.random() < (rate_id / 8):
+            return 1
+        else:
+            return 0
+        
+    def get_random_personality() -> int:
+        return random.randint(0, 2**32)

@@ -7,7 +7,7 @@ class Trainer:
     public_id: int
     secret_id: int
 
-    def __init__(self, name, gender, public_id, secret_id):
+    def __init__(self, name: str, gender: int, public_id: int, secret_id: int):
         self.name = name
         self.gender = gender
         self.public_id = public_id
