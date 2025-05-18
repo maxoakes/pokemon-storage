@@ -1,19 +1,43 @@
 import json
-import random
 from Database import Database
 from Models.Game import Game
 from Models.Item import Item
-    
+from Models.Location import Location
+
+class AbilityMapping:
+    first: int
+    second: int
+    hidden: int
+
+    def __init__(self):
+        self.first = self.second = self.hidden = 0
+
+    def assign(self, value, slot, is_hidden):
+        if is_hidden == 1:
+            self.hidden = value
+        else:
+            if slot == 1:
+                self.first = value
+            elif slot == 2:
+                self.second = value
+
+    def get_abilities(self) -> tuple[int]:
+        return (self.first, self.second)
+
+
 class Lookup:
     games: dict[int, Game]
     pokemon: dict[int, str]
     moves: dict[int, str]
     items: dict[int, Item]
     abilities: dict[int, str]
+    ability_mapping: dict[int, AbilityMapping]
+    natures: dict[int, str]
+    nature_mapping: dict[int, int]
     gender_rates: dict[int, int]
     base_happiness: dict[int, int]
     language: dict[int, str]
-    gender: dict[int, str]
+    locations: dict[int, Location]
     pokemon_gen1_index = dict[int, int]
     pokemon_gen3_index = dict[int, int]
     pokemon_gen4_index = dict[int, int]
@@ -24,8 +48,11 @@ class Lookup:
         Lookup.moves = {}
         Lookup.items = {}
         Lookup.abilities = {}
+        Lookup.ability_mapping = {}
+        Lookup.natures = {}
+        Lookup.nature_mapping = {}
         Lookup.language = {}
-        Lookup.gender = {}
+        Lookup.locations = {}
         Lookup.gender_rates = {}
         Lookup.base_happiness = {}
         Lookup.pokemon_gen1_index = {}
@@ -115,11 +142,69 @@ class Lookup:
             else:
                 Lookup.items[id] = Item(id, identifier)
 
+        try:
+            with open("mappings/item_index_gen2.json", 'r') as file:
+                gen2_item_mapping: dict[int, int] = json.load(file, object_hook=keystoint)
+                for (key, value) in gen2_item_mapping.items():
+                    Lookup.items[value].id_mapping[2] = key
+        except:
+            pass
+
         # abilities
         ability_results = Database.run_query_return_rows("SELECT * FROM abilities")
         for (id, name, generation, main) in ability_results:
             Lookup.abilities[id] = name
 
+        ability_mapping_results = Database.run_query_return_rows("""
+            SELECT 
+                ps.id, 
+                pa.ability_id, 
+                pa.slot, 
+                pa.is_hidden 
+            FROM 
+                pokemon p 
+                LEFT JOIN pokemon_species ps ON p.species_id = ps.id 
+                LEFT JOIN pokemon_abilities pa ON p.id=pa.pokemon_id 
+            WHERE p.id <= 10000
+        """)
+
+        for (species_id, ability_id, slot, is_hidden) in ability_mapping_results:
+            if not species_id in Lookup.ability_mapping:
+                Lookup.ability_mapping[species_id] = AbilityMapping()
+            Lookup.ability_mapping[species_id].assign(ability_id, slot, is_hidden)
+
+        # natures
+        nature_results = Database.run_query_return_rows("SELECT id, identifier, game_index FROM natures")
+        for (id, name, game_index) in nature_results:
+            Lookup.natures[id] = name
+            Lookup.nature_mapping[game_index] = id
+
+
+        location_results = Database.run_query_return_rows("""
+            SELECT 
+                l.id, l.identifier, lgi.generation_id, lgi.game_index 
+            FROM
+                locations l 
+                LEFT JOIN location_game_indices lgi ON l.id=lgi.location_id 
+            WHERE 
+                l.region_id IS NOT NULL 
+            ORDER BY
+                l.id 
+        """)
+
+        for (id, name, generation_id, game_index) in location_results:
+            if not id in Lookup.locations:
+                Lookup.locations[id] = Location(id, name)
+            Lookup.locations[id].generation_indicies[generation_id] = game_index
+
+        try:
+            with open("mappings/location_index_gen2.json", 'r') as file:
+                gen2_location_mapping: dict[int, int] = json.load(file, object_hook=keystoint)
+                for (key, value) in gen2_location_mapping.items():
+                    Lookup.locations[value].generation_indicies[2] = key
+        except:
+            pass
+            
         # lang
         Lookup.language[0] = ""
         Lookup.language[1] = "JP"
@@ -131,31 +216,78 @@ class Lookup:
         Lookup.language[7] = "ES"
         Lookup.language[8] = "KR"
 
-        # gender
-        Lookup.gender[0] = "M"
-        Lookup.gender[1] = "F"
-        Lookup.gender[2] = "X"
 
-
-    def get_item_name_by_id(generation, game_index) -> str:
+    def get_item_id_by_index(generation, game_index) -> int:
         if game_index == 0:
-            return ""
+            return 0
         
         for item in Lookup.items.values():
             if generation in item.id_mapping.keys():
                 if item.id_mapping[generation] == game_index:
-                    return item.identifier
-        return "?"
+                    return item.id
+        return 0
     
-    def get_random_gender(species_id) -> int:
-        rate_id = Lookup.gender_rates.get(species_id, -1)
-        if rate_id == -1:
-            return 2
-        
-        if random.random() < (rate_id / 8):
-            return 1
+
+    def get_item_name(id) -> str:
+        if id == 0:
+            return ""
         else:
-            return 0
-        
-    def get_random_personality() -> int:
-        return random.randint(0, 2**32)
+            if id in Lookup.items:
+                return Lookup.items[id].name
+            else:
+                return "???"
+
+
+    def get_species_id_by_index(generation: int, game_index: int) -> int:
+        match generation:
+            case 1:
+                return Lookup.pokemon_gen1_index.get(game_index, 0)
+            case 3:
+                return Lookup.pokemon_gen3_index.get(game_index, 0)
+            case 4:
+                return Lookup.pokemon_gen4_index.get(game_index, 0)
+            case _:
+                return game_index
+            
+
+    def get_species_name(id) -> str:
+        return Lookup.pokemon.get(id, "???")
+    
+
+    def get_gender_threshold(species_id) -> int:
+        threshold = {
+            0: 0,
+            1: 31,
+            2: 63,
+            4: 127,
+            6: 191,
+            7: 225,
+            8: 254,
+            -1: 255
+        } # key/8 chance of being female
+        gender_rate = Lookup.get_gender_rate(species_id)
+        return threshold.get(gender_rate, 255)
+    
+
+    def get_gender_rate(species_id):
+        return Lookup.gender_rates.get(species_id, -1)
+    
+
+    def get_base_happiness(species_id) -> int:
+        return Lookup.base_happiness.get(species_id, 0)
+    
+    
+    def get_abilities(species_id) -> tuple[int]:
+        return Lookup.ability_mapping[species_id].get_abilities()
+    
+
+    def get_ability_name(ability_id) -> str:
+        return Lookup.abilities.get(ability_id, "???")
+    
+
+    def get_nature_name(nature_id) -> str:
+        return Lookup.natures.get(nature_id, "???")
+    
+
+    def get_nature_id_by_index(index) -> int:
+        return Lookup.nature_mapping.get(index, 0)

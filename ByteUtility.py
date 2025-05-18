@@ -27,7 +27,7 @@ class ByteUtility:
             result[i] ^= byte
         return bytes(result)
 
-    def get_encoded_string(data, version, lang):
+    def get_encoded_string(data, version, lang) -> str:
         result = ""
         if version in (1,2,3,4,5,6,7):
             null_terminators = [0]

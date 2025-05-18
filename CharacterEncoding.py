@@ -1,6 +1,7 @@
 class CharacterEncoding:
     en_gen1 = {
-        0x00:"\x00",
+        0x00:"\0",
+        0x00:"\0",
         0x7F:" ",
         0x80:"A",
         0x81:"B",
@@ -101,7 +102,8 @@ class CharacterEncoding:
     }
 
     en_gen2 = {
-        0x00:"\x00",
+        0x00:"\0",
+        0x50:"\0",
         0x60:"█",
         0x61:"▲",
         0x62:"🖁",
