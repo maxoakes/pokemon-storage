@@ -7,3 +7,6 @@ class Location:
         self.id = id
         self.name = name
         self.generation_indicies = {}
+
+    def __str__(self):
+        return self.name

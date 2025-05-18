@@ -36,11 +36,13 @@ class Lookup:
     nature_mapping: dict[int, int]
     gender_rates: dict[int, int]
     base_happiness: dict[int, int]
-    language: dict[int, str]
+    languages: dict[int, str]
     locations: dict[int, Location]
     pokemon_gen1_index = dict[int, int]
     pokemon_gen3_index = dict[int, int]
     pokemon_gen4_index = dict[int, int]
+    game_gen3_index = dict[int, int]
+    catch_ball_index_gen3 = dict[int, str]
 
     def initialize():
         Lookup.games = {}
@@ -51,13 +53,15 @@ class Lookup:
         Lookup.ability_mapping = {}
         Lookup.natures = {}
         Lookup.nature_mapping = {}
-        Lookup.language = {}
+        Lookup.languages = {}
         Lookup.locations = {}
         Lookup.gender_rates = {}
         Lookup.base_happiness = {}
         Lookup.pokemon_gen1_index = {}
         Lookup.pokemon_gen3_index = {}
         Lookup.pokemon_gen4_index = {}
+        Lookup.game_gen3_index = {}
+        Lookup.catch_ball_index_gen3 = {}
 
         # pokemon species game index id mappings
         def keystoint(x):
@@ -113,6 +117,14 @@ class Lookup:
         """)
         for (id, version, gen, name) in game_results:
             Lookup.games[id] = Game(id, name, version, gen)
+
+        try:
+            with open("mappings/game_index_gen3.json", 'r') as file:
+                gen3_game_mapping: dict[int, int] = json.load(file, object_hook=keystoint)
+                for (key, value) in gen3_game_mapping.items():
+                    Lookup.game_gen3_index[key] = value
+        except:
+            pass
 
         # moves
         move_results = Database.run_query_return_rows("SELECT id, identifier, generation_id FROM moves")
@@ -204,20 +216,31 @@ class Lookup:
                     Lookup.locations[value].generation_indicies[2] = key
         except:
             pass
+
+        try:
+            with open("mappings/location_index_gen3.json", 'r') as file:
+                gen2_location_mapping: dict[int, int] = json.load(file, object_hook=keystoint)
+                for (key, value) in gen2_location_mapping.items():
+                    Lookup.locations[value].generation_indicies[3] = key
+        except:
+            pass
             
-        # lang
-        Lookup.language[0] = ""
-        Lookup.language[1] = "JP"
-        Lookup.language[2] = "EN"
-        Lookup.language[3] = "FR"
-        Lookup.language[4] = "IT"
-        Lookup.language[5] = "DE"
-        Lookup.language[6] = ""
-        Lookup.language[7] = "ES"
-        Lookup.language[8] = "KR"
+        try:
+            with open("mappings/language_index.json", 'r') as file:
+                Lookup.languages = json.load(file, object_hook=keystoint)
+        except:
+            pass
+
+        try:
+            with open("mappings/catch_ball_index_gen3.json", 'r') as file:
+                catch_ball_index_gen3: dict[int, str] = json.load(file, object_hook=keystoint)
+                for (key, value) in catch_ball_index_gen3.items():
+                    Lookup.catch_ball_index_gen3[key] = value
+        except:
+            pass
 
 
-    def get_item_id_by_index(generation, game_index) -> int:
+    def get_item_id_by_index(generation: int, game_index: int) -> int:
         if game_index == 0:
             return 0
         
@@ -291,3 +314,38 @@ class Lookup:
 
     def get_nature_id_by_index(index) -> int:
         return Lookup.nature_mapping.get(index, 0)
+    
+
+    def get_language_by_id(language_id) -> str:
+        return Lookup.languages.get(language_id, "")
+    
+
+    def get_location_name_by_id(location_id) -> str:
+        return Lookup.locations.get(location_id, "???")
+    
+
+    def get_location_id_by_index(generation: int, game_index: int) -> int:
+        if game_index == 0:
+            return 0
+        
+        for location in Lookup.locations.values():
+            if generation in location.generation_indicies.keys():
+                if location.generation_indicies[generation] == game_index:
+                    return location.id
+        return 0
+    
+
+    def get_catch_ball_by_id(generation_id: int, index: int) -> str:
+        match generation_id:
+            case 3:
+                return Lookup.catch_ball_index_gen3.get(index, "???")
+            case _:
+                return "poke-ball"
+            
+
+    def get_game_of_origin(generation_id: int, index: int) -> int:
+        match generation_id:
+            case 3:
+                return Lookup.game_gen3_index.get(index, 19)
+            case _:
+                return 1

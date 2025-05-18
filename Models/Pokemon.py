@@ -14,28 +14,31 @@ class Origin:
     egg_receive_date: int
     met_date: int
     encounter_type: int
-    pokeball: int
-    origin_game: int
+    pokeball: str
+    origin_game_id: int
     met_level: int
-    catch_datetime: datetime.datetime
+    met_datetime: datetime.datetime
     catch_level: int
     catch_location: str
-    met_location: str
+    met_location: int
 
     def __init__(self):
         self.fateful_encounter = False
         self.egg_hatch_location = 0
         self.egg_receive_date = 0
-        self.met_date = 0
         self.encounter_type = 0
-        self.pokeball = 0
-        self.origin_game = 0
+        self.pokeball = ""
+        self.origin_game_id = 0
         self.met_level = 1
-        self.catch_datetime = datetime.datetime.strptime("2000/01/01 00:00:00", "%Y/%m/%d %H:%M:%S")
+        self.met_location = 0
+        self.met_datetime = datetime.datetime.strptime("2000/01/01 00:00:00", "%Y/%m/%d %H:%M:%S")
         pass
 
     def __str__(self):
-        return f"Met at Lv.{self.met_level}"
+        return f"Met at Lv.{self.met_level} at {Lookup.get_location_name_by_id(self.met_location)} in game {Lookup.games[self.origin_game_id]} via {self.pokeball}"
+    
+    def __repr__(self):
+        return self.__str__()
     
 
 class Move:
@@ -44,7 +47,7 @@ class Move:
     pp: int
     times_increased: int
 
-    def __init__(self, id, pp, times_increased):
+    def __init__(self, id: int, pp: int, times_increased: int):
         self.id = id
         self.identifer = Lookup.moves.get(id, "")
         self.pp = pp
@@ -72,6 +75,9 @@ class Stat:
 
     def __str__(self):
         return f"{self.value}, Exp:{self.ev}, IV:{self.iv}"
+    
+    def __repr__(self):
+        return self.__str__()
     
 
 class RibbonSet:
@@ -168,6 +174,9 @@ class RibbonSet:
     def __str__(self):
         return f""
     
+    def __repr__(self):
+        return self.__str__()
+    
 
 class Markings:
     circle: bool
@@ -177,12 +186,14 @@ class Markings:
     star: bool
     diamond: bool
 
-    def __init__(self, generation, byte):
+    def __init__(self, generation, byte: int):
         if generation == 3:
             self.circle = bool(ByteUtility.get_bit(byte,0))
             self.square = bool(ByteUtility.get_bit(byte,1))
             self.trinagle = bool(ByteUtility.get_bit(byte,2))
             self.heart = bool(ByteUtility.get_bit(byte,3))
+            self.star = False
+            self.diamond = False
         else:
             self.circle = bool(ByteUtility.get_bit(byte,0))
             self.trinagle = bool(ByteUtility.get_bit(byte,1))
@@ -206,6 +217,10 @@ class Markings:
         if self.diamond:
             result.append("DIAMOND")
         return ";".join(result)
+    
+    def __repr__(self):
+        return self.__str__()
+    
 
 class Pokemon:
 
@@ -262,6 +277,7 @@ class Pokemon:
     shiny_leaf_3: bool
     shiny_leaf_4: bool
     shiny_crown: bool
+    gen3_misc: int
 
     def __init__(self, generation):
         # game
@@ -317,6 +333,7 @@ class Pokemon:
         self.shiny_leaf_3 = False
         self.shiny_leaf_4 = False
         self.shiny_crown = False
+        self.gen3_misc = 0
 
 
     def console_print(self):
@@ -334,6 +351,7 @@ class Pokemon:
             f"\tSeals: {bin(ByteUtility.get_int(self.seals, 0, len(self.seals), True))[2:].zfill(len(self.seals)*8)} Coordinates: {bin(ByteUtility.get_int(self.seal_coordinates, 0, len(self.seal_coordinates), True))[2:].zfill(len(self.seal_coordinates)*8)}",
             f"\tShinyLeafs:{self.shiny_leaf_1}:{self.shiny_leaf_2}:{self.shiny_leaf_3}:{self.shiny_leaf_4} Crown:{self.shiny_crown}",
             f"\tMarkings:{self.markings}",
+            f"\tHp:{self.hp}",
             f"\tAtk:{self.attack}",
             f"\tDef:{self.defense}",
             f"\tSpe:{self.speed}",
@@ -487,63 +505,70 @@ class Pokemon:
         origin_bits = bin(ByteUtility.get_int(content, 0x1D, 2))[2:].zfill(16)
         time_of_day = int(origin_bits[0:2], 2)
         if time_of_day == 1:
-            self.origin.catch_datetime.replace(hour=8)
+            self.origin.met_datetime.replace(hour=8)
         elif time_of_day == 2:
-            self.origin.catch_datetime.replace(hour=14)
+            self.origin.met_datetime.replace(hour=14)
         elif time_of_day == 3:
-            self.origin.catch_datetime.replace(hour=20)
+            self.origin.met_datetime.replace(hour=20)
         self.origin.met_level = max(int(origin_bits[2:7], 2), 2)
         self.origin.met_location = int(origin_bits[9:15], 2)
         self.original_trainer = Trainer(trainer_name, int(origin_bits[8], 2), ByteUtility.get_int(content, 0x06, 2), ByteUtility.get_int(content, 0x06, 2, True))
         if version == 4 and self.original_trainer.public_id % 1 == 1:
             self.original_trainer.gender = Gender.FEMALE
+
         
+    # https://bulbapedia.bulbagarden.net/wiki/Pok%C3%A9mon_data_structure_(Generation_III)
     def load_from_gen3_bytes(self, content: bytes, version: int, lang: str):
         self.personality_value = ByteUtility.get_int(content, 0x00, 4, True)
-        self.trainer_id = ByteUtility.get_int(content, 0x04, 2, True)
+        ot_id = ByteUtility.get_int(content, 0x04, 4, True)
+        self.original_trainer = Trainer(
+            ByteUtility.get_encoded_string(ByteUtility.get_bytes(content, 0x14, 7), version, lang), 
+            0, 
+            ot_id >> 16,
+            ot_id % (2 ** 16)
+        )
         self.nickname = ByteUtility.get_encoded_string(ByteUtility.get_bytes(content, 0x08, 10), version, lang)
-        self.language = ByteUtility.get_int(content, 0x12, 1, True)
-        self.trainer_name = ByteUtility.get_encoded_string(ByteUtility.get_bytes(content, 0x14, 7), version, lang)
-        self.markings = ByteUtility.get_int(content, 0x1b, 1, True)
+        self.language = Lookup.get_language_by_id(ByteUtility.get_int(content, 0x12, 1, True))
+        self.gen3_misc = ByteUtility.get_int(content, 0x13, 1, True)
+        self.markings = Markings(3, ByteUtility.get_int(content, 0x1B, 1, True))
         self.level = ByteUtility.get_int(content, 0x54, 1, True)
-        self.mail_id = ByteUtility.get_int(content, 0x55, 1, True)
-        self.hp_stat = ByteUtility.get_int(content, 0x58, 2, True)
-        self.attack_stat = ByteUtility.get_int(content, 0x5a, 2, True)
-        self.defense_stat = ByteUtility.get_int(content, 0x5c, 2, True)
-        self.speed_stat = ByteUtility.get_int(content, 0x5e, 2, True)
-        self.special_attack_stat = ByteUtility.get_int(content, 0x60, 2, True)
-        self.special_defense_stat = ByteUtility.get_int(content, 0x62, 2, True)
-        checksum = ByteUtility.get_int(content, 0x1c, 2, True)
+        self.hp = Stat(ByteUtility.get_int(content, 0x58, 2, True), 0, 0)
+        self.attack = Stat(ByteUtility.get_int(content, 0x5a, 2, True), 0, 0)
+        self.defense = Stat(ByteUtility.get_int(content, 0x5c, 2, True), 0, 0)
+        self.speed = Stat(ByteUtility.get_int(content, 0x5e, 2, True), 0, 0)
+        self.special_attack = Stat(ByteUtility.get_int(content, 0x60, 2, True), 0, 0)
+        self.special_defense = Stat(ByteUtility.get_int(content, 0x62, 2, True), 0, 0)
+
+        # placeholders
+        self.moves[0] = Move(0, 0, 0)
+        self.moves[1] = Move(0, 0, 0)
+        self.moves[2] = Move(0, 0, 0)
+        self.moves[3] = Move(0, 0, 0)
 
         # data substructure
-        print(self.nickname)
-        substructure_bytes_encrypted = ByteUtility.get_bytes(content, 0x20, 48)
-        order = ByteUtility.get_int(content, 0x00, 4, True) % 24
-        print(order)
+        checksum = ByteUtility.get_int(content, 0x1C, 2, True)
+        full_encrypted = ByteUtility.get_bytes(content, 0x20, 48)
+        order_index = self.personality_value % 24
         
         order = {
-            0: "GAEM", 1:"GAME", 2:"GEAM", 3:"GEMA",
-            4: "GMAE", 5:"GMEA", 6:"AGEM", 7:"AGME",
-            8: "AEGM", 9:"AEMG",10:"AMGE",11:"AMEG",
-            12:"AGAM",13:"EGMA",14:"EAGM",15:"EAMG",
-            16:"EMGA",17:"EMAG",18:"MGAE",19:"MGEA",
-            20:"MAGE",21:"MAEG",22:"MEGA",23:"MEAG"
+            0: "GAEM", 1:"GAME", 2:"GEAM", 3:"GEMA",4: "GMAE", 5:"GMEA", 6:"AGEM", 7:"AGME",
+            8: "AEGM", 9:"AEMG",10:"AMGE",11:"AMEG",12:"AGAM",13:"EGMA",14:"EAGM",15:"EAMG",
+            16:"EMGA",17:"EMAG",18:"MGAE",19:"MGEA",20:"MAGE",21:"MAEG",22:"MEGA",23:"MEAG"
         }
 
-        order_string = order[order]
+        order_string = order[order_index]
         print(f"Order:{order}:{order_string}")
         decryption_key = bytes(a ^ b for a, b in zip(ByteUtility.get_bytes(content, 0x04, 4), ByteUtility.get_bytes(content, 0x00, 4)))
-        print(f"Decryption:{ByteUtility.get_int(decryption_key, 0,4)}")
-        substructure_bytes_decrypted = b''
-        for i in range(48):
-            if i % 4 == 0:
-                y = ByteUtility.get_bytes(substructure_bytes_encrypted, 0x1*i, 4)
-                unencrypted = bytes(a ^ b for a, b in zip(y, decryption_key))
-                substructure_bytes_decrypted += unencrypted
+        print(f"Decryption:{ByteUtility.get_int(decryption_key, 0, 4)}")
+        full_decrypted = b''
+        for i in range(0, 48, 4):
+            y = ByteUtility.get_bytes(full_encrypted, 0x1*i, 4)
+            unencrypted = bytes(a ^ b for a, b in zip(y, decryption_key))
+            full_decrypted += unencrypted
+
         calculated = 0
-        for i in range(48):
-            if i % 2 == 0:
-                calculated += ByteUtility.get_int(substructure_bytes_decrypted, 0x1*i, 2,True)
+        for i in range(0, 48, 2):
+            calculated += ByteUtility.get_int(full_decrypted, 0x1*i, 2,True)
 
         print(f"{checksum & 0xff} ?== {calculated & 0xff}")
         print(bin(calculated)[2:].zfill(24))
@@ -551,86 +576,137 @@ class Pokemon:
 
         for i, c in enumerate(order_string):
             offset = i*12
-            print(f"{c}:{bin(ByteUtility.get_int(substructure_bytes_decrypted, offset, 12, True))[2:].zfill(12*8)}")
+            print(f"{c}:{bin(ByteUtility.get_int(full_decrypted, offset, 12, True))[2:].zfill(12*8)}")
             match c:
                 case "G":
-                    self.species_id = Lookup.pokemon_gen3_index.get(ByteUtility.get_int(substructure_bytes_decrypted, 0x0+offset, 2, True),0)
-                    self.held_item = ByteUtility.get_int(substructure_bytes_decrypted, 0x2+offset, 2, True)
-                    self.experience_points = ByteUtility.get_int(substructure_bytes_decrypted, 0x4+offset, 4, True)
-                    self.friendship = ByteUtility.get_int(substructure_bytes_decrypted, 0x9+offset, 1, True)
+                    self.species_id = Lookup.pokemon_gen3_index.get(ByteUtility.get_int(full_decrypted, 0x0+offset, 2, True), 0)
+                    self.held_item = Lookup.get_item_id_by_index(3, ByteUtility.get_int(full_decrypted, 0x2+offset, 2, True))
+                    self.experience_points = ByteUtility.get_int(full_decrypted, 0x4+offset, 4, True)
+                    self.friendship = ByteUtility.get_int(full_decrypted, 0x9+offset, 1, True)
 
-                    pp_bonuses = bin(ByteUtility.get_int(substructure_bytes_decrypted, 0x08+offset, 1, True))[2:].zfill(8)
-                    self.move1_pp_times = int(pp_bonuses[0:2], 2)
-                    self.move2_pp_times = int(pp_bonuses[2:4], 2)
-                    self.move3_pp_times = int(pp_bonuses[4:6], 2)
-                    self.move4_pp_times = int(pp_bonuses[6:8], 2)
+                    pp_bonuses = bin(ByteUtility.get_int(full_decrypted, 0x08+offset, 1, True))[2:].zfill(8)
+                    self.moves[0].times_increased = int(pp_bonuses[0:2], 2)
+                    self.moves[1].times_increased = int(pp_bonuses[2:4], 2)
+                    self.moves[2].times_increased = int(pp_bonuses[4:6], 2)
+                    self.moves[3].times_increased = int(pp_bonuses[6:8], 2)
                     continue
 
                 case "A":
-                    self.move1 = ByteUtility.get_int(substructure_bytes_decrypted, 0x0+offset, 2, True)
-                    self.move2 = ByteUtility.get_int(substructure_bytes_decrypted, 0x2+offset, 2, True)
-                    self.move3 = ByteUtility.get_int(substructure_bytes_decrypted, 0x4+offset, 2, True)
-                    self.move4 = ByteUtility.get_int(substructure_bytes_decrypted, 0x6+offset, 2, True)
-                    self.move1_pp = ByteUtility.get_int(substructure_bytes_decrypted, 0x8+offset, 1, True)
-                    self.move2_pp = ByteUtility.get_int(substructure_bytes_decrypted, 0x9+offset, 1, True)
-                    self.move3_pp = ByteUtility.get_int(substructure_bytes_decrypted, 0xA+offset, 1, True)
-                    self.move4_pp = ByteUtility.get_int(substructure_bytes_decrypted, 0xB+offset, 1, True)
+                    self.moves[0].id = ByteUtility.get_int(full_decrypted, 0x0+offset, 2, True)
+                    self.moves[1].id = ByteUtility.get_int(full_decrypted, 0x2+offset, 2, True)
+                    self.moves[2].id = ByteUtility.get_int(full_decrypted, 0x4+offset, 2, True)
+                    self.moves[3].id = ByteUtility.get_int(full_decrypted, 0x6+offset, 2, True)
+                    self.moves[0].pp = ByteUtility.get_int(full_decrypted, 0x8+offset, 1, True)
+                    self.moves[1].pp = ByteUtility.get_int(full_decrypted, 0x9+offset, 1, True)
+                    self.moves[2].pp = ByteUtility.get_int(full_decrypted, 0xA+offset, 1, True)
+                    self.moves[3].pp = ByteUtility.get_int(full_decrypted, 0xB+offset, 1, True)
                     continue
 
                 case "E":
-                    self.hp_stat_experience = ByteUtility.get_int(substructure_bytes_decrypted, 0x0+offset, 1, True)
-                    self.attack_stat_experience = ByteUtility.get_int(substructure_bytes_decrypted, 0x1+offset, 1, True)
-                    self.defense_stat_experience = ByteUtility.get_int(substructure_bytes_decrypted, 0x2+offset, 1, True)
-                    self.speed_stat_experience = ByteUtility.get_int(substructure_bytes_decrypted, 0x3+offset, 1, True)
-                    self.special_attack_stat_experience = ByteUtility.get_int(substructure_bytes_decrypted, 0x4+offset, 1, True)
-                    self.special_defense_stat_experience = ByteUtility.get_int(substructure_bytes_decrypted, 0x5+offset, 1, True)
-                    self.coolness = ByteUtility.get_int(substructure_bytes_decrypted, 0x6+offset, 1, True)
-                    self.beauty = ByteUtility.get_int(substructure_bytes_decrypted, 0x7+offset, 1, True)
-                    self.cuteness = ByteUtility.get_int(substructure_bytes_decrypted, 0x8+offset, 1, True)
-                    self.smartness = ByteUtility.get_int(substructure_bytes_decrypted, 0x9+offset, 1, True)
-                    self.toughness = ByteUtility.get_int(substructure_bytes_decrypted, 0xA+offset, 1, True)
-                    self.sheen = ByteUtility.get_int(substructure_bytes_decrypted, 0xB+offset, 1, True)
+                    self.hp.ev = ByteUtility.get_int(full_decrypted, 0x0+offset, 1, True)
+                    self.attack.ev = ByteUtility.get_int(full_decrypted, 0x1+offset, 1, True)
+                    self.defense.ev = ByteUtility.get_int(full_decrypted, 0x2+offset, 1, True)
+                    self.speed.ev = ByteUtility.get_int(full_decrypted, 0x3+offset, 1, True)
+                    self.special_attack.ev = ByteUtility.get_int(full_decrypted, 0x4+offset, 1, True)
+                    self.special_defense.ev = ByteUtility.get_int(full_decrypted, 0x5+offset, 1, True)
+                    self.coolness = ByteUtility.get_int(full_decrypted, 0x6+offset, 1, True)
+                    self.beauty = ByteUtility.get_int(full_decrypted, 0x7+offset, 1, True)
+                    self.cuteness = ByteUtility.get_int(full_decrypted, 0x8+offset, 1, True)
+                    self.smartness = ByteUtility.get_int(full_decrypted, 0x9+offset, 1, True)
+                    self.toughness = ByteUtility.get_int(full_decrypted, 0xA+offset, 1, True)
+                    self.sheen = ByteUtility.get_int(full_decrypted, 0xB+offset, 1, True)
                     continue
 
                 case "M":
-                    pokerus = bin(ByteUtility.get_int(substructure_bytes_decrypted, 0x0+offset, 1, True))[2:].zfill(8)
-                    self.pokerus = int(pokerus[4:8], 2)
+                    # pokerus
+                    pokerus = bin(ByteUtility.get_int(full_decrypted, 0x0+offset, 1, True))[2:].zfill(8)
+                    self.pokerus = ByteUtility.get_int(full_decrypted, 0x0+offset, 1, True) != 0
                     self.pokerus_days_remaining = int(pokerus[0:4], 2)
-                    self.met_location = ByteUtility.get_int(substructure_bytes_decrypted, 0x1+offset, 1, True)
+                    self.pokerus_strain = int(pokerus[4:7], 2)
 
-                    origins = bin(ByteUtility.get_int(substructure_bytes_decrypted, 0x2+offset, 2, True))[2:].zfill(16)
-                    self.trainer_gender = int(origins[15], 2)
-                    self.pokeball = int(origins[11:14], 2)
-                    self.origin_game = int(origins[7:10], 2)
-                    self.level_met = int(origins[0:6], 2)
+                    # met location
+                    self.origin.met_location = Lookup.get_location_id_by_index(3, ByteUtility.get_int(full_decrypted, 0x1+offset, 1, True))
 
-                    iv_egg_ability = bin(ByteUtility.get_int(substructure_bytes_decrypted, 0x4+offset, 4, True))[2:].zfill(32)
-                    self.hp_iv = int(iv_egg_ability[0:4], 2)
-                    self.attack_iv = int(iv_egg_ability[5:9], 2)
-                    self.defense_iv = int(iv_egg_ability[10:14], 2)
-                    self.speed_iv = int(iv_egg_ability[15:19], 2)
-                    self.special_attack_iv = int(iv_egg_ability[20:24], 2)
-                    self.special_defense_iv = int(iv_egg_ability[25:29], 2)
-                    self.is_egg = int(iv_egg_ability[30], 2)
-                    self.ability = int(iv_egg_ability[31], 2)
+                    origins = bin(ByteUtility.get_int(full_decrypted, 0x2+offset, 2, True))[2:].zfill(16)
+                    print(origins)
+                    self.original_trainer.gender = Gender(int(origins[0], 2))
+                    self.origin.pokeball = Lookup.get_catch_ball_by_id(3, int(origins[1:5], 2))
+                    self.origin.origin_game_id = Lookup.get_game_of_origin(3, int(origins[5:9], 2))
+                    self.origin.met_level = int(origins[9:16], 2)
 
-                    ribbons_obedience = bin(ByteUtility.get_int(substructure_bytes_decrypted, 0x8+offset, 4, True))[2:].zfill(32)
-                    self.cool_ribbon = int(ribbons_obedience[0:2], 2)
-                    self.beauty_ribbon = int(ribbons_obedience[3:5], 2)
-                    self.cute_ribbon = int(ribbons_obedience[6:8], 2)
-                    self.smart_ribbon = int(ribbons_obedience[9:11], 2)
-                    self.tough_ribbon = int(ribbons_obedience[12:14], 2)
-                    self.champion_ribbon = int(ribbons_obedience[15], 2)
-                    self.winning_ribbon = int(ribbons_obedience[16], 2)
-                    self.victory_ribbon = int(ribbons_obedience[17], 2)
-                    self.artist_ribbon = int(ribbons_obedience[18], 2)
-                    self.effort_ribbon = int(ribbons_obedience[19], 2)
-                    self.battle_champion_ribbon = int(ribbons_obedience[20], 2)
-                    self.regional_champion_ribbon = int(ribbons_obedience[21], 2)
-                    self.national_champion_ribbon = int(ribbons_obedience[22], 2)
-                    self.country_ribbon = int(ribbons_obedience[23], 2)
-                    self.national_ribbon = int(ribbons_obedience[24], 2)
-                    self.earth_ribbon = int(ribbons_obedience[25], 2)
-                    self.world_ribbon = int(ribbons_obedience[26], 2)
-                    self.obedience = int(ribbons_obedience[31], 2)
+                    iv_egg_ability = bin(ByteUtility.get_int(full_decrypted, 0x4+offset, 4, True))[2:].zfill(32)
+                    self.hp.iv = int(iv_egg_ability[27:32], 2)
+                    self.attack.iv = int(iv_egg_ability[22:27], 2)
+                    self.defense.iv = int(iv_egg_ability[17:22], 2)
+                    self.speed.iv = int(iv_egg_ability[12:17], 2)
+                    self.special_attack.iv = int(iv_egg_ability[7:12], 2)
+                    self.special_defense.iv = int(iv_egg_ability[2:7], 2)
+                    self.is_egg = int(iv_egg_ability[1], 2)
+                    self.ability = int(iv_egg_ability[0], 2)
+
+                    ribbons_obedience = bin(ByteUtility.get_int(full_decrypted, 0x8+offset, 4, True))[2:].zfill(32)
+                    cool_ribbons = int(ribbons_obedience[29:32], 2)
+                    if cool_ribbons >= 1:
+                        self.ribbons.heonn_cool = True
+                    if cool_ribbons >= 2:
+                        self.ribbons.heonn_cool_super = True
+                    if cool_ribbons >= 3:
+                        self.ribbons.heonn_cool_super = True
+                    if cool_ribbons >= 4:
+                        self.ribbons.heonn_cool_master = True
+
+                    beauty_ribbons = int(ribbons_obedience[26:29], 2)
+                    if beauty_ribbons >= 1:
+                        self.ribbons.heonn_beauty = True
+                    if beauty_ribbons >= 2:
+                        self.ribbons.heonn_beauty_super = True
+                    if beauty_ribbons >= 3:
+                        self.ribbons.heonn_beauty_super = True
+                    if beauty_ribbons >= 4:
+                        self.ribbons.heonn_beauty_master = True
+
+                    cute_ribbons = int(ribbons_obedience[23:26], 2)
+                    if cute_ribbons >= 1:
+                        self.ribbons.heonn_cute = True
+                    if cute_ribbons >= 2:
+                        self.ribbons.heonn_cute_super = True
+                    if cute_ribbons >= 3:
+                        self.ribbons.heonn_cute_super = True
+                    if cute_ribbons >= 4:
+                        self.ribbons.heonn_cute_master = True
+
+                    smart_ribbons = int(ribbons_obedience[20:23], 2)
+                    if smart_ribbons >= 1:
+                        self.ribbons.heonn_smart = True
+                    if smart_ribbons >= 2:
+                        self.ribbons.heonn_smart_super = True
+                    if smart_ribbons >= 3:
+                        self.ribbons.heonn_smart_super = True
+                    if smart_ribbons >= 4:
+                        self.ribbons.heonn_smart_master = True
+
+                    tough_ribbons = int(ribbons_obedience[17:20], 2)
+                    if tough_ribbons >= 1:
+                        self.ribbons.heonn_tough = True
+                    if tough_ribbons >= 2:
+                        self.ribbons.heonn_tough_super = True
+                    if tough_ribbons >= 3:
+                        self.ribbons.heonn_tough_super = True
+                    if tough_ribbons >= 4:
+                        self.ribbons.heonn_tough_master = True
+
+                    self.ribbons.champion = int(ribbons_obedience[16], 2)
+                    self.ribbons.winning = int(ribbons_obedience[15], 2)
+                    self.ribbons.victory = int(ribbons_obedience[14], 2)
+                    self.ribbons.artist = int(ribbons_obedience[13], 2)
+                    self.ribbons.effort = int(ribbons_obedience[12], 2)
+                    self.ribbons.marine = int(ribbons_obedience[11], 2)
+                    self.ribbons.land = int(ribbons_obedience[10], 2)
+                    self.ribbons.sky = int(ribbons_obedience[9], 2)
+                    self.ribbons.country = int(ribbons_obedience[8], 2)
+                    self.ribbons.national = int(ribbons_obedience[7], 2)
+                    self.ribbons.earth = int(ribbons_obedience[6], 2)
+                    self.ribbons.world = int(ribbons_obedience[5], 2)
+                    self.obedience = int(ribbons_obedience[0], 2)
                     continue
+
