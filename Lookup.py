@@ -349,3 +349,60 @@ class Lookup:
                 return Lookup.game_gen3_index.get(index, 19)
             case _:
                 return 1
+            
+    
+    def get_base_stats(species_id: int) -> tuple:
+        results = Database.run_query_return_rows("""
+            SELECT 
+                ps.id,
+                SUM(CASE WHEN ps2.stat_id=1 THEN ps2.base_stat ELSE 0 END) AS hp,
+                SUM(CASE WHEN ps2.stat_id=2 THEN ps2.base_stat ELSE 0 END) AS attack,
+                SUM(CASE WHEN ps2.stat_id=3 THEN ps2.base_stat ELSE 0 END) AS defense,
+                SUM(CASE WHEN ps2.stat_id=4 THEN ps2.base_stat ELSE 0 END) AS special_attack,
+                SUM(CASE WHEN ps2.stat_id=5 THEN ps2.base_stat ELSE 0 END) AS special_defense,
+                SUM(CASE WHEN ps2.stat_id=6 THEN ps2.base_stat ELSE 0 END) AS speed
+            FROM 
+                pokemon p 
+                LEFT JOIN pokemon_species ps ON ps.id=p.species_id 
+                LEFT JOIN pokemon_stats ps2 ON ps2.pokemon_id=p.id
+            WHERE p.id < 10000 AND ps.id = (%s)
+            GROUP BY ps.id
+        """, (species_id, ))
+
+        for (id, hp, attack, defense, special_attack, special_defense, speed) in results:
+            return (hp, attack, defense, special_attack, special_defense, speed)
+        
+
+    def get_nature_stats(nature_id: int):
+        results = Database.run_query_return_rows("SELECT increased_stat_id, decreased_stat_id FROM natures WHERE id = (%s)", (nature_id, ))
+
+        for (increased, decreased) in results:
+            return (increased, decreased)
+        
+
+    def get_growth_rate_id(species_id: int):
+        results = Database.run_query_return_rows("SELECT growth_rate_id FROM pokemon_species WHERE id=(%s)", (species_id, ))
+
+        for (rate, ) in results:
+            return rate
+        
+
+    def get_level_from_experience(species_id: int, experience: int) -> int:
+        results = Database.run_query_return_rows("""
+            SELECT 
+                e.level,
+                e.experience,
+                ps.id,
+                ps.identifier 
+            FROM 
+                experience e 
+                LEFT JOIN pokemon_species ps ON ps.growth_rate_id=e.growth_rate_id
+            WHERE 
+                ps.id = (%s) AND
+                e.experience > (%s)
+            ORDER BY ps.id, `level` 
+        """, (species_id, experience))
+
+        for (level, exp, sp, id) in results:
+            return max(level - 1, 0)
+        return 1

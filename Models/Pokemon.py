@@ -24,13 +24,13 @@ class Origin:
 
     def __init__(self):
         self.fateful_encounter = False
-        self.egg_hatch_location = 0
+        self.egg_hatch_location = 1
         self.egg_receive_date = 0
-        self.encounter_type = 0
-        self.pokeball = ""
-        self.origin_game_id = 0
+        self.encounter_type = 1
+        self.pokeball = "poke-ball"
+        self.origin_game_id = 1
         self.met_level = 1
-        self.met_location = 0
+        self.met_location = 1
         self.met_datetime = datetime.datetime.strptime("2000/01/01 00:00:00", "%Y/%m/%d %H:%M:%S")
         pass
 
@@ -74,7 +74,7 @@ class Stat:
         self.iv = iv
 
     def __str__(self):
-        return f"{self.value}, Exp:{self.ev}, IV:{self.iv}"
+        return f"[SV:{self.value}/EV:{self.ev}/IV:{self.iv}]"
     
     def __repr__(self):
         return self.__str__()
@@ -336,7 +336,10 @@ class Pokemon:
         self.gen3_misc = 0
 
 
-    def console_print(self):
+    def get_one_liner_description(self):
+        return (f"{Lookup.get_species_name(self.species_id)}({self.get_gender_by_personality_value().name})({self.species_id})/{self.nickname} Lv.{self.level} HP->{self.hp} Att->{self.attack} Def->{self.defense} SpA->{self.special_attack} SpD->{self.special_defense} Spe->{self.speed}")
+
+    def print_full_details(self):
         print(
             f"{self.species_id}: {Lookup.get_species_name(self.species_id)} Form:{self.alternate_form_id} Gen:{self.generation} Lang:{self.language}",
             f"\tHasNickname:{self.has_nickname} Nickname:[{self.nickname}]",
@@ -351,6 +354,7 @@ class Pokemon:
             f"\tSeals: {bin(ByteUtility.get_int(self.seals, 0, len(self.seals), True))[2:].zfill(len(self.seals)*8)} Coordinates: {bin(ByteUtility.get_int(self.seal_coordinates, 0, len(self.seal_coordinates), True))[2:].zfill(len(self.seal_coordinates)*8)}",
             f"\tShinyLeafs:{self.shiny_leaf_1}:{self.shiny_leaf_2}:{self.shiny_leaf_3}:{self.shiny_leaf_4} Crown:{self.shiny_crown}",
             f"\tMarkings:{self.markings}",
+            f"\tCalculated:{self.get_calculated_stats(self.generation)}",
             f"\tHp:{self.hp}",
             f"\tAtk:{self.attack}",
             f"\tDef:{self.defense}",
@@ -363,13 +367,16 @@ class Pokemon:
             f"\tM4:{self.moves.get(3, '')}",
         sep=os.linesep)
 
+
     # personality assignments and results
     def get_personality_value(self) -> int:
         return random.randint(0, 2**32)
     
+    
     def get_personality_string(self):
         binary = bin(self.personality_value)[2:].zfill(32)
         return " ".join(binary[i:i+8] for i in range(0, len(binary), 8))
+    
 
     def get_gender_by_personality_value(self) -> Gender:
         p_gender = self.personality_value % 256
@@ -385,6 +392,7 @@ class Pokemon:
                 return Gender.MALE
             else:
                 return Gender.FEMALE
+            
             
     def get_gender_by_iv(self):
         ratio = Lookup.get_gender_rate(self.species_id)
@@ -409,9 +417,11 @@ class Pokemon:
         else:
             return 0
         
+        
     def get_nature_from_personality_value(self) -> int:
         p_nature = self.personality_value % 25
         return Lookup.get_nature_id_by_index(p_nature)
+    
     
     def get_shiny_from_personality_value(self) -> bool:
         p1 = math.floor(self.personality_value / 65536) 
@@ -419,18 +429,75 @@ class Pokemon:
         shiny_value = self.original_trainer.public_id ^ self.original_trainer.secret_id ^ p1 ^ p2
         return shiny_value < 8
     
+
     def check_if_nickname(self):
         return re.sub(r"[^0-9a-zA-Z\w]+", "", self.nickname.lower().replace(" ","-")) != Lookup.get_species_name(self.species_id).lower()
 
+
+    def get_calculated_stats(self, generation_id):
+        (base_hp, base_attack, base_defense, base_special_attack, base_special_defense, base_speed) = Lookup.get_base_stats(self.species_id)
+
+        if generation_id > 2:
+            (increased_id, decreased_id) = Lookup.get_nature_stats(self.get_nature_from_personality_value())
+            modified_attack = 1
+            modified_defense = 1
+            modified_special_attack = 1
+            modified_special_defense = 1
+            modified_speed = 1
+
+            match increased_id:
+                case 2:
+                    modified_attack = 1.1
+                case 3:
+                    modified_defense = 1.1
+                case 4:
+                    modified_special_attack = 1.1
+                case 5:
+                    modified_special_defense = 1.1
+                case 6:
+                    modified_speed = 1.1
+
+            match decreased_id:
+                case 2:
+                    modified_attack = 0.9
+                case 3:
+                    modified_defense = 0.9
+                case 4:
+                    modified_special_attack = 0.9
+                case 5:
+                    modified_special_defense = 0.9
+                case 6:
+                    modified_speed = 0.9
+
+            hp = math.floor( ((2 * base_hp + self.hp.iv + math.floor(self.hp.ev/4)) * self.level) / 100) + self.level + 10
+            attack = math.floor( (math.floor(((2 * base_attack + self.attack.iv + math.floor(self.attack.ev/4)) * self.level)/100) + 5) * modified_attack)
+            defense = math.floor( (math.floor(((2 * base_defense + self.defense.iv + math.floor(self.defense.ev/4)) * self.level)/100) + 5) * modified_defense) 
+            special_attack = math.floor( (math.floor(((2 * base_special_attack + self.special_attack.iv + math.floor(self.special_attack.ev/4)) * self.level)/100) + 5) * modified_special_attack) 
+            special_defense = math.floor( (math.floor(((2 * base_special_defense + self.special_defense.iv + math.floor(self.special_defense.ev/4)) * self.level)/100) + 5) * modified_special_defense) 
+            speed = math.floor( (math.floor(((2 * base_speed + self.speed.iv + math.floor(self.speed.ev/4)) * self.level)/100) + 5) * modified_speed) 
+            return (hp, attack, defense, special_attack, special_defense, speed)
+        else:
+            hp = math.floor( (((base_hp + self.hp.iv) * 2 + math.floor(math.sqrt(self.hp.ev) / 4) ) * self.level) / 100) + self.level + 10
+            attack = math.floor( (((base_attack + self.attack.iv) * 2 + math.floor(math.sqrt(self.attack.ev) / 4) )* self.level) / 100) + 5
+            defense = math.floor( (((base_defense + self.defense.iv) * 2 + math.floor(math.sqrt(self.defense.ev) / 4)) * self.level) / 100) + 5
+            special_attack = math.floor( (((base_special_attack + self.special_attack.iv) * 2 + math.floor(math.sqrt(self.special_attack.ev) / 4)) * self.level) / 100) + 5
+            special_defense =math.floor( (((base_special_defense + self.special_defense.iv) * 2 + math.floor(math.sqrt(self.special_defense.ev) / 4)) * self.level) / 100) + 5
+            speed = math.floor( (((base_speed + self.speed.iv) * 2 + math.floor(math.sqrt(self.speed.ev) / 4)) * self.level) / 100) + 5
+            return (hp, attack, defense, special_attack, special_defense, speed)
     
+    
+    def get_calculated_level(self):
+        return Lookup.get_level_from_experience(self.species_id, self.experience_points)
+            
+
     # Decoding
     # https://bulbapedia.bulbagarden.net/wiki/Pok%C3%A9mon_data_structure_(Generation_I)
     def load_from_gen1_bytes(self, content: bytes, version: int, nickname, trainer_name):
         self.nickname = nickname
         self.original_trainer = Trainer(trainer_name, 0, ByteUtility.get_int(content, 0x0C, 2), ByteUtility.get_int(content, 0x0C, 2, True))
         self.species_id = Lookup.get_species_id_by_index(1, ByteUtility.get_int(content, 0, 1))
-        self.level = ByteUtility.get_int(content, 0x21, 1)
         self.experience_points = ByteUtility.get_int(content, 0x0E, 3)
+        self.level = Lookup.get_level_from_experience(self.species_id, self.experience_points)
         self.has_nickname = self.check_if_nickname()
         self.personality_value = self.get_personality_value()
         self.friendship = Lookup.get_base_happiness(self.species_id)
@@ -449,24 +516,28 @@ class Pokemon:
         self.moves[3] = Move(ByteUtility.get_int(content, 0x0B, 0x01), int(pp4[2:8], 2), int(pp4[0:2], 2))
 
         # get stats
-        bits = bin(ByteUtility.get_int(content, 0x1B, 2))[2:]
+        bits = bin(ByteUtility.get_int(content, 0x1B, 2))[2:].zfill(16)
         iv_stats = [bits[i:i+4] for i in range(0, len(bits), 4)]
 
-        self.hp = Stat(ByteUtility.get_int(content, 0x22, 2), ByteUtility.get_int(content, 0x11, 2), 0)
-        self.attack = Stat(ByteUtility.get_int(content, 0x24, 2), ByteUtility.get_int(content, 0x13, 2), int(iv_stats[0], 2))
-        self.defense = Stat(ByteUtility.get_int(content, 0x26, 2), ByteUtility.get_int(content, 0x15, 2), int(iv_stats[1], 2))
-        self.speed = Stat(ByteUtility.get_int(content, 0x28, 2), ByteUtility.get_int(content, 0x17, 2), int(iv_stats[2], 2))
-        self.special_attack = Stat(ByteUtility.get_int(content, 0x2A, 2), ByteUtility.get_int(content, 0x19, 2), int(iv_stats[3], 2))
-        self.special_defense = Stat(ByteUtility.get_int(content, 0x2A, 2), ByteUtility.get_int(content, 0x19, 2), int(iv_stats[3], 2))        
+        self.hp = Stat(0, ByteUtility.get_int(content, 0x11, 2), int(bits[3::4],2))
+        self.attack = Stat(0, ByteUtility.get_int(content, 0x13, 2), int(iv_stats[0], 2))
+        self.defense = Stat(0, ByteUtility.get_int(content, 0x15, 2), int(iv_stats[1], 2))
+        self.speed = Stat(0, ByteUtility.get_int(content, 0x17, 2), int(iv_stats[2], 2))
+        self.special_attack = Stat(0, ByteUtility.get_int(content, 0x19, 2), int(iv_stats[3], 2))
+        self.special_defense = Stat(0, ByteUtility.get_int(content, 0x19, 2), int(iv_stats[3], 2))
+        (self.hp.value, self.attack.value, self.defense.value, self.special_attack.value, self.special_defense.value, self.speed.value) = self.get_calculated_stats(self.generation)
+
+        # generics
+        self.origin.origin_game_id = version
 
 
     # https://bulbapedia.bulbagarden.net/wiki/Pok%C3%A9mon_data_structure_(Generation_II)
-    def load_from_gen2_bytes(self, content: bytes, version: int, nickname, trainer_name):
+    def load_from_gen2_bytes(self, content: bytes, version: int, nickname: str, trainer_name: str):
         self.nickname = nickname
-        self.level = ByteUtility.get_int(content, 0x1F, 1)
-        self.experience_points = ByteUtility.get_int(content, 0x08, 3)
-        self.species_id = ByteUtility.get_int(content, 0x00, 1)
         self.has_nickname = self.check_if_nickname()
+        self.species_id = ByteUtility.get_int(content, 0x00, 1)
+        self.experience_points = ByteUtility.get_int(content, 0x08, 3)
+        self.level = Lookup.get_level_from_experience(self.species_id, self.experience_points)
         self.personality_value = self.get_personality_value()
         self.friendship = ByteUtility.get_int(content, 0x1B, 1)
         self.held_item = Lookup.get_item_id_by_index(2, ByteUtility.get_int(content, 0x01, 1))
@@ -488,12 +559,13 @@ class Pokemon:
         bits = bin(ByteUtility.get_int(content, 0x15, 2))[2:].zfill(16)
         iv_stats = [bits[i:i+4] for i in range(0, len(bits), 4)]
 
-        self.hp = Stat(ByteUtility.get_int(content, 0x24, 2), ByteUtility.get_int(content, 0x0B, 2), 0)
-        self.attack = Stat(ByteUtility.get_int(content, 0x26, 2), ByteUtility.get_int(content, 0x0D, 2), int(iv_stats[0], 2))
-        self.defense = Stat(ByteUtility.get_int(content, 0x28, 2), ByteUtility.get_int(content, 0x0F, 2), int(iv_stats[1], 2))
-        self.speed = Stat(ByteUtility.get_int(content, 0x2A, 2), ByteUtility.get_int(content, 0x11, 2), int(iv_stats[2], 2))
-        self.special_attack = Stat(ByteUtility.get_int(content, 0x2C, 2), ByteUtility.get_int(content, 0x13, 2), int(iv_stats[3], 2))
-        self.special_defense = Stat(ByteUtility.get_int(content, 0x2E, 2), ByteUtility.get_int(content, 0x15, 2), int(iv_stats[3], 2))
+        self.hp = Stat(0, ByteUtility.get_int(content, 0x0B, 2), int(bits[3::4],2))
+        self.attack = Stat(0, ByteUtility.get_int(content, 0x0D, 2), int(iv_stats[0], 2))
+        self.defense = Stat(0, ByteUtility.get_int(content, 0x0F, 2), int(iv_stats[1], 2))
+        self.speed = Stat(0, ByteUtility.get_int(content, 0x11, 2), int(iv_stats[2], 2))
+        self.special_attack = Stat(0, ByteUtility.get_int(content, 0x13, 2), int(iv_stats[3], 2))
+        self.special_defense = Stat(0, ByteUtility.get_int(content, 0x15, 2), int(iv_stats[3], 2))
+        (self.hp.value, self.attack.value, self.defense.value, self.special_attack.value, self.special_defense.value, self.speed.value) = self.get_calculated_stats(self.generation)
 
         # pokerus
         pokerus_data = ByteUtility.get_int(content, 0x1C, 1)
